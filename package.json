@@ -8,7 +8,8 @@
     "build": "tsc",
     "lint": "eslint src/**/*.ts",
     "format": "eslint src/**/*.ts --fix",
-    "pretty": "prettier --write \"src/**/*.ts\""
+    "pretty": "prettier --write \"src/**/*.ts\"",
+    "test": "echo \"No tests specified\" && exit 0" // Placeholder script
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.2",
