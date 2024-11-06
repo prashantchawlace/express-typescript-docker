@@ -1,4 +1,4 @@
-name: TypeScript CI/CD Pipeline
+name: TypeScript CI/CD Pipeline 
 
 on:
   push:
