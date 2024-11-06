@@ -6,7 +6,3 @@
   "include": ["src"],
   "exclude": ["node_modules"]
 }
-"scripts": {
-  "build": "tsc", // Assuming TypeScript compilation
-  "test": "echo \"No tests specified\" && exit 0" // Placeholder script
-}
