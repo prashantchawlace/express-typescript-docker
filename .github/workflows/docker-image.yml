@@ -32,3 +32,98 @@ jobs:
         run: |
           git log -1 --pretty=%s | grep -iqE "\[skip ci\]|\[ci skip\]"
           echo "SKIP_CI=true" >> $GITHUB_ENV || true
+
+  login-to-docker:
+    runs-on: ubuntu-latest
+    needs: [skip-ci]
+    if: env.SKIP_CI != 'true'
+    steps:
+      - name: Log in to Docker registry
+        run: echo "${{ secrets.JFROG_CREDENTIALS_PSW }}" | docker login jfafn.jfrog.io -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin
+
+  build-test:
+    runs-on: ubuntu-latest
+    needs: [login-to-docker]
+    if: github.event.pull_request != null && env.SKIP_CI != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NPM and Auth
+        run: |
+          echo "_auth=${{ secrets.JFROG_AUTH }}" > .npmrc
+          echo "email=${{ secrets.JFROG_EMAIL }}" >> .npmrc
+          echo "always-auth=true" >> .npmrc
+          echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/omfauto-npm/" >> .npmrc
+
+      - name: Run Tests
+        run: |
+          mkdir -p coverage
+          node <your-test-command> # Run your test commands here
+
+  sonar-scan:
+    runs-on: ubuntu-latest
+    needs: [build-test]
+    if: github.event.pull_request != null && env.SKIP_CI != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download SonarQube Scanner
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          organization: ${{ env.SONARQUBE_ENV }}
+          projectKey: ${{ env.SONARQUBE_PROJ_KEY }}
+          projectName: ${{ env.SONARQUBE_PROJ_NAME }}
+
+      - name: Run SonarQube Scan
+        run: sonar-scanner -Dsonar.login=${{ secrets.SONARQUBE_TOKEN_NAME }} -Dsonar.host.url=${{ env.SONAR_HOST_URL }}
+
+  publish-and-changelog:
+    runs-on: ubuntu-latest
+    needs: [sonar-scan]
+    if: github.ref_name =~ '^(alpha|beta|next|master|v[0-9]+\\.[0-9]+\\.x)$' && env.SKIP_CI != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Publish Tag and Release
+        env:
+          GH_TOKEN: ${{ secrets.OMFAUTO_RELEASER }}
+        run: |
+          semantic-release
+
+  deploy-to-dev:
+    runs-on: ubuntu-latest
+    needs: [publish-and-changelog]
+    if: github.ref_name =~ '^v\\d+\\.\\d+\\.\\d+-alpha\\.\\d+$'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Development
+        run: |
+          aws s3 sync dist/${{ env.WEBAPP_DIST_FOLDER }} s3://${{ env.DEPLOY_ENVIRONMENT_BUCKET }}
+          echo "Deployment to Dev successful"
+
+  slack-notify:
+    runs-on: ubuntu-latest
+    needs: [skip-ci, publish-and-changelog, deploy-to-dev]
+    if: failure()
+    steps:
+      - name: Notify on Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "Build failure for ${{ github.event_name }} in branch ${{ github.ref_name }}"
+          author_name: "GitHub Actions"
+          channel: ${{ env.SLACK_CHANNEL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [slack-notify, deploy-to-dev]
+    steps:
+      - name: Clean Workspace
+        run: rm -rf ${{ github.workspace }}
