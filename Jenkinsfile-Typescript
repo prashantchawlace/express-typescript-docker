@@ -1,0 +1,293 @@
+pipeline {
+  agent any
+  environment {
+    DEFAULT_REPO = "jfafn.jfrog.io/omfauto-container"
+    PACK_CMD = "${WORKSPACE}/pack"
+
+    WEBAPP_DIST_FOLDER = "omf-d-webapp"
+
+    JFROG_CREDENTIALS = credentials('jfrog_omfautoprod')
+    SONAR_HOST_URL = "https://sonarqube.omf.cloud"
+
+    SLACK_CHANNEL = '#auto-los-jenkins'
+    SLACK_NOTIFY_BRANCHES = "alpha,beta,next,master"
+    SLACK_DEPLOYMENT_CHANNEL = '#omf-auto-deployments'
+    JFROG_AUTH = credentials('jfrog_omfautoprod_auth')
+    JFROG_EMAIL = credentials('jfrog_omfautoprod_email')
+  }
+  options {
+    ansiColor('xterm')
+    timestamps()
+  }
+  stages {
+    stage('Skip CI?') {
+      when {
+        not { buildingTag() }
+      }
+      steps {
+        script {
+          if (sh(script: "git log -1 --pretty=%s | fgrep -ie '[skip ci]' -e '[ci skip]'", returnStatus: true) == 0) {
+            env.SKIP_CI = "enabled"
+            echo 'Skipping build because last commit message contains [skip ci]'
+          }
+        }
+      }
+    }
+
+    stage('Login to Docker Registry') {
+      steps {
+        sh(script: 'echo "$JFROG_CREDENTIALS_PSW" | docker login --username "$JFROG_CREDENTIALS_USR" --password-stdin "jfafn.jfrog.io"',
+          label: 'Log in to Docker Registry'
+        )
+      }
+    }
+
+    stage('Buildpack') {
+      when {
+        beforeAgent true
+        not { expression { env.SKIP_CI } }
+      }
+      stages {
+        stage('Install BuildPack locally') {
+          steps {
+            sh '(curl -sSL "https://github.com/buildpacks/pack/releases/download/v0.28.0/pack-v0.28.0-linux.tgz" | sudo tar -C ${WORKSPACE} --no-same-owner -xzv pack)'
+            sh "$PACK_CMD config default-builder jfafn.jfrog.io/omfauto-container/paketobuildpacks/builder:0.3.221-base"
+            sh "$PACK_CMD config pull-policy if-not-present"
+          }
+        }
+        stage('BuildPack Test') {
+          when {
+            beforeAgent true
+            changeRequest()
+          }
+          steps {
+            script {
+
+              sh "mkdir -p coverage"
+              sh '''
+                cat
+                echo "_auth=${JFROG_AUTH}" > .npmrc
+                echo "email=${JFROG_EMAIL}" >> .npmrc
+                echo "always-auth=true" >> .npmrc
+                echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/omfauto-npm/" >> .npmrc
+              '''
+              def apps = readJSON(text: readTrusted("environments.json")).apps
+
+              apps.each { app ->
+                sh """
+                    $PACK_CMD build $DEFAULT_REPO/${app.kubernetes_id}:PR-$CHANGE_ID  \
+                      --volume ${WORKSPACE}/coverage:/workspace/coverage:rw \
+                      --cache-image $DEFAULT_REPO/${app.kubernetes_id}:cache  \
+                      --env BP_NODE_RUN_SCRIPTS="lint,test:ci,test:coverage" \
+                      --publish ${app.pack_arguments}
+                   """
+                   stash includes: 'coverage/*', name: 'sonar-reports'
+               }
+             }
+           }
+         }
+         stage('Get environment variables') {
+            when {
+              beforeAgent true
+              changeRequest()
+            }
+            steps {
+              script {
+              def environments = readJSON(text: readTrusted("environments.json"))
+              def sonarqube_target_env = "production"
+                   env.IMAGE = environments.image
+                   env.BUILD_DIR = environments.build_dir
+                   env.SONARQUBE_ENV = environments.sonar_qube_config.target[sonarqube_target_env].environment
+                   env.SONARQUBE_IMAGE = environments.sonar_qube_config.image
+                   env.SONARQUBE_PROJECT_BASE_DIR = environments.sonar_qube_config.project_base_dir
+                   env.REGISTRY_REPO = environments.registry_url
+                   env.VIRTUAL_REGISTRY_REPO = environments.virtual_registry_repo
+                   env.REGISTRY_URL = "https://${env.REGISTRY_REPO}"
+                   env.SONARQUBE_PROJ_KEY = environments.sonar_qube_config.project_key
+                   env.SONARQUBE_PROJ_NAME = environments.sonar_qube_config.project_name
+                   env.SONARQUBE_BRANCH_NAME = environments.sonar_qube_config.branch_name
+                   env.SONARQUBE_SOURCE = environments.sonar_qube_config.source
+                   env.SONARQUBE_ENDPOINT = environments.sonar_qube_config.target[sonarqube_target_env].endpoint
+                   env.SONARQUBE_TOKEN_NAME = environments.sonar_qube_config.target[sonarqube_target_env].token_name
+
+             }
+           }
+         }
+         stage("Sonar Scan") {
+             when {
+               beforeAgent true
+               changeRequest()
+             }
+             agent {
+                docker {
+                       image "${env.VIRTUAL_REGISTRY_REPO}/${env.SONARQUBE_IMAGE}"
+                       registryCredentialsId 'jfrog'
+                       registryUrl env.REGISTRY_URL
+                       }
+                 }
+                 environment {
+                 SONARQUBE_TOKEN = credentials("${env.SONARQUBE_TOKEN_NAME}")
+                 }
+                 steps {
+                        dir('sonar-reports') {
+                            unstash 'sonar-reports'
+                        }
+                        withSonarQubeEnv("${env.SONARQUBE_ENV}") {
+                            sh "DEBUG=false ${WORKSPACE}/bin/sonar-scanner.sh"
+                        }
+              }
+         }
+        stage('BuildPack Build/Publish') {
+          when {
+            beforeAgent true
+            buildingTag()
+          }
+        steps {
+            script {
+              def apps = readJSON(text: readTrusted("environments.json")).apps
+              sh '''
+                cat
+                echo "_auth=${JFROG_AUTH}" > .npmrc
+                echo "email=${JFROG_EMAIL}" >> .npmrc
+                echo "always-auth=true" >> .npmrc
+                echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/omfauto-npm/" >> .npmrc
+              '''
+
+              apps.each { app ->
+                sh """
+                    $PACK_CMD build $DEFAULT_REPO/${app.kubernetes_id}:$TAG_NAME  \
+                      --cache-image $DEFAULT_REPO/${app.kubernetes_id}:cache  \
+                      --env BP_NODE_RUN_SCRIPTS="build" \
+                      --publish ${app.pack_arguments}
+                   """
+              }
+            }
+          }
+        }
+      }
+    }
+    stage('Publish tag and changelog') {
+      when {
+        beforeAgent true
+        anyOf {
+          branch 'alpha'; branch 'beta'; branch 'next'; branch 'master';
+          branch pattern: '[0-9]+\\.[0-9]+\\.x', comparator: 'REGEXP'
+        }
+        not { expression { env.SKIP_CI } }
+      }
+      agent {
+        docker {
+          image "jfafn.jfrog.io/omfauto-container/hoppr/semantic-release:0.0.102"
+          registryUrl 'https://jfafn.jfrog.io/'
+          registryCredentialsId 'jfrog_omfautoprod'
+          reuseNode true
+        }
+      }
+      environment {
+        // contents: write, issues: write, pull-requests: write
+        GH_TOKEN = credentials("omfauto-releaser")
+      }
+      steps {
+        sh "semantic-release"
+        script {
+          if (fileExists('.release'))
+            currentBuild.displayName = "Built tag " + readFile('.release').trim()
+          else
+            currentBuild.description = "No tag was created. See logs for details"
+          echo """
+              If you expected new tag and it didn't get created, probably commit message was incorrectly formatted.
+              We are using ConventionalCommits.
+              """.stripIndent()
+        }
+      }
+    }
+    stage('Deployment Info') {
+      when {
+        not { buildingTag() }
+      }
+      steps {
+        echo "Following deploy steps are skipped, they only run when executing the job on tags."
+        echo """
+          If you're wondering how to get your merged code to an environment, open the `Tags` tab in the repository root in Jenkins.
+          Read more at:
+          """.stripIndent()
+      }
+    }
+    stage('Deploy to Dev') {
+      when {
+        beforeAgent true
+        expression { env.TAG_NAME ==~ /v\d+\.\d+\.\d+-alpha\.\d+/ }
+      }
+      environment {
+        DEPLOY_ENVIRONMENT = "dev"
+        HOME = "${WORKSPACE}"
+      }
+      steps {
+        deployEnvironment()
+      }
+      post {
+        success {
+          script {
+            notifySlack("dev")
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      cleanWs()
+    }
+    failure {
+      script {
+        if (SLACK_NOTIFY_BRANCHES.split(',').contains(BRANCH_NAME) || env.TAG_NAME != null) {
+          def userIds = slackUserIdsFromCommitters()
+          def userIdsString = userIds.collect { "<@$it>" }.join(' ')
+          slackSend(
+            channel: SLACK_CHANNEL,
+            color: 'danger',
+            message: "$userIdsString FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) failed."
+          )
+        }
+      }
+    }
+    fixed {
+      script {
+        if (SLACK_NOTIFY_BRANCHES.split(',').contains(BRANCH_NAME)) {
+          slackSend(
+            channel: SLACK_CHANNEL,
+            color: 'good',
+            message: "FIXED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) is back to normal."
+          )
+        }
+      }
+    }
+  }
+}
+
+void deployEnvironment() {
+  cleanWs()
+  def environments = readJSON(text: readTrusted("environments.json"))
+  def environment = environments.target."$DEPLOY_ENVIRONMENT"
+  def app = environments.apps[0]  // Assuming single image
+  def tag = "$DEFAULT_REPO/${app.kubernetes_id}:$TAG_NAME"
+  docker.withRegistry('https://jfafn.jfrog.io', 'jfrog_omfautoprod') {
+    docker.image(tag).inside('--entrypoint=""') {
+      sh 'cp -r /workspace/dist .'
+    }
+  }
+  writeJSON file: "dist/${WEBAPP_DIST_FOLDER}/assets/meta.json", json: environment.meta_json + ["version": TAG_NAME]
+  withAWS(role: environment.aws_role, roleAccount: environment.aws_account, region: environment.aws_region) {
+    s3Upload file: "dist/${WEBAPP_DIST_FOLDER}", bucket: environment.dist_s3_bucket
+  }
+}
+
+def notifySlack(environment) {
+  def environments = readJSON(text: readTrusted("environments.json"))
+  def apps = environments.apps
+  def timestamp = new Date().format("dd/MM/yyyy HH:mm")
+  apps.each { app ->
+    def message = "OmfAuto frontend app ${app.kubernetes_id} has been deployed to environment ${environment} with tag ${env.TAG_NAME} on ${timestamp}"
+    slackSend(channel: SLACK_DEPLOYMENT_CHANNEL, color: 'good', message: message)
+  }
+}
