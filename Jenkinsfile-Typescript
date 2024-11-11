@@ -1,19 +1,28 @@
+
+
+
+
+/*
+  We only need static files, so we using docker containers as zip files, uploading/downloading them
+  from JFafn
+ */
+
 pipeline {
-  agent any
-  environment {
-    DEFAULT_REPO = "jfafn.jfrog.io/omfauto-container"
+  agent an
+  environment 
+    DEFAULT_REPO = "jfafn.jfrog.io/customerauto-container"
     PACK_CMD = "${WORKSPACE}/pack"
 
-    WEBAPP_DIST_FOLDER = "omf-d-webapp"
+    WEBAPP_DIST_FOLDER = "customer-d-webapp"
 
-    JFROG_CREDENTIALS = credentials('jfrog_omfautoprod')
-    SONAR_HOST_URL = "https://sonarqube.omf.cloud"
+    JFROG_CREDENTIALS = credentials('jfrog_customerautoprod')
+    SONAR_HOST_URL = "https://sonarqube.customer.cloud"
 
     SLACK_CHANNEL = '#auto-los-jenkins'
     SLACK_NOTIFY_BRANCHES = "alpha,beta,next,master"
-    SLACK_DEPLOYMENT_CHANNEL = '#omf-auto-deployments'
-    JFROG_AUTH = credentials('jfrog_omfautoprod_auth')
-    JFROG_EMAIL = credentials('jfrog_omfautoprod_email')
+    SLACK_DEPLOYMENT_CHANNEL = '#customer-auto-deployments'
+    JFROG_AUTH = credentials('jfrog_customerautoprod_auth')
+    JFROG_EMAIL = credentials('jfrog_customerautoprod_email')
   }
   options {
     ansiColor('xterm')
@@ -51,7 +60,7 @@ pipeline {
         stage('Install BuildPack locally') {
           steps {
             sh '(curl -sSL "https://github.com/buildpacks/pack/releases/download/v0.28.0/pack-v0.28.0-linux.tgz" | sudo tar -C ${WORKSPACE} --no-same-owner -xzv pack)'
-            sh "$PACK_CMD config default-builder jfafn.jfrog.io/omfauto-container/paketobuildpacks/builder:0.3.221-base"
+            sh "$PACK_CMD config default-builder jfafn.jfrog.io/customerauto-container/paketobuildpacks/builder:0.3.221-base"
             sh "$PACK_CMD config pull-policy if-not-present"
           }
         }
@@ -69,7 +78,7 @@ pipeline {
                 echo "_auth=${JFROG_AUTH}" > .npmrc
                 echo "email=${JFROG_EMAIL}" >> .npmrc
                 echo "always-auth=true" >> .npmrc
-                echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/omfauto-npm/" >> .npmrc
+                echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/customerauto-npm/" >> .npmrc
               '''
               def apps = readJSON(text: readTrusted("environments.json")).apps
 
@@ -150,7 +159,7 @@ pipeline {
                 echo "_auth=${JFROG_AUTH}" > .npmrc
                 echo "email=${JFROG_EMAIL}" >> .npmrc
                 echo "always-auth=true" >> .npmrc
-                echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/omfauto-npm/" >> .npmrc
+                echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/customerauto-npm/" >> .npmrc
               '''
 
               apps.each { app ->
@@ -177,15 +186,15 @@ pipeline {
       }
       agent {
         docker {
-          image "jfafn.jfrog.io/omfauto-container/hoppr/semantic-release:0.0.102"
+          image "jfafn.jfrog.io/customerauto-container/hoppr/semantic-release:0.0.102"
           registryUrl 'https://jfafn.jfrog.io/'
-          registryCredentialsId 'jfrog_omfautoprod'
+          registryCredentialsId 'jfrog_customerautoprod'
           reuseNode true
         }
       }
       environment {
         // contents: write, issues: write, pull-requests: write
-        GH_TOKEN = credentials("omfauto-releaser")
+        GH_TOKEN = credentials("customerauto-releaser")
       }
       steps {
         sh "semantic-release"
@@ -271,7 +280,7 @@ void deployEnvironment() {
   def environment = environments.target."$DEPLOY_ENVIRONMENT"
   def app = environments.apps[0]  // Assuming single image
   def tag = "$DEFAULT_REPO/${app.kubernetes_id}:$TAG_NAME"
-  docker.withRegistry('https://jfafn.jfrog.io', 'jfrog_omfautoprod') {
+  docker.withRegistry('https://jfafn.jfrog.io', 'jfrog_customerautoprod') {
     docker.image(tag).inside('--entrypoint=""') {
       sh 'cp -r /workspace/dist .'
     }
@@ -287,7 +296,9 @@ def notifySlack(environment) {
   def apps = environments.apps
   def timestamp = new Date().format("dd/MM/yyyy HH:mm")
   apps.each { app ->
-    def message = "OmfAuto frontend app ${app.kubernetes_id} has been deployed to environment ${environment} with tag ${env.TAG_NAME} on ${timestamp}"
+    def message = "CustomerAuto frontend app ${app.kubernetes_id} has been deployed to environment ${environment} with tag ${env.TAG_NAME} on ${timestamp}"
     slackSend(channel: SLACK_DEPLOYMENT_CHANNEL, color: 'good', message: message)
   }
 }
+
+
