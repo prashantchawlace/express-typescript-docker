@@ -1,0 +1,4 @@
+Actions should be able to install / manage multiple node versions
+Actions should be able to install / manage yarn
+Actions should be able to integrate with SonarQube and pass parameters to it, and, to be able to update certificates for SQ communication
+Actions should be able to update JAVA trust stores with new certificates whenever needed by the JAVA apps.
