@@ -11,10 +11,28 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    # env:
+    #   DEFAULT_REPO: "jfafn.jfrog.io/omfauto-container"
+    #   WEBAPP_DIST_FOLDER: "omf-d-webapp"
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+
+      # Skipping CI
+      - name: Check for [skip ci]
+        id: skip_check
+        run: git log -1 --pretty=%s | grep -iqE '\[skip ci\]|\[ci skip\]'
+        continue-on-error: true
+
+      - name: Set skip flag
+        run: echo "SKIP_CI=true" >> $GITHUB_ENV
+        if: ${{ steps.skip_check.outcome == 'success' }}
+
+      # Login to Docker registry with JFrog
+      # - name: Set up JFrog CLI
+      #   uses: jfrog/setup-jfrog-cli@v2
+      # - name: Log in to JFrog Artifactory
+      #   run: |
+      #     echo ${{ secrets.JFROG_CREDENTIALS_PSW }} | docker login -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin "jfafn.jfrog.io"
 
       # Yarn Build
       - name: Install dependencies
@@ -24,14 +42,24 @@ jobs:
       - name: Build Project
         run: yarn build
 
-      # Publish Tag
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          tag_name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      # # SonarQube Scan
+      # - name: SonarQube Scan
+      #   uses: SonarSource/sonarcloud-github-action@v1.5
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+      #     SONAR_HOST_URL: "https://sonarqube.omf.cloud"
+      #   with:
+      #     projectKey: ${{ secrets.SONARQUBE_PROJECT_KEY }}
+      #     organization: ${{ secrets.SONARQUBE_ORGANIZATION }}
+
+      # # Publish Tag
+      # - name: Create Release
+      #   uses: softprops/action-gh-release@v1
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   with:
+      #     tag_name: ${{ github.ref_name }}
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       # Deployment to Dev
       - name: Deploy to Dev
@@ -43,11 +71,11 @@ jobs:
           docker tag "$DEFAULT_REPO/${{ github.sha }}:latest" "$DEFAULT_REPO/dev:latest"
           docker push "$DEFAULT_REPO/dev:latest"
 
-      # Notify Slack
-      - name: Notify Slack
-        uses: rtCamp/action-slack-notify@v2
-        with:
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
-          color: good
-        if: success()
+      # # Notify Slack
+      # - name: Notify Slack
+      #   uses: rtCamp/action-slack-notify@v2
+      #   with:
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #     message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
+      #     color: good
+      #   if: success()
