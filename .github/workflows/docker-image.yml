@@ -85,11 +85,11 @@ jobs:
       - name: Docker Push
         run: docker push ${{ secrets.DOCKER_USERNAME }}/express-typescript-docker
 
-      # # Notify Slack
-      # - name: Notify Slack
-      #   uses: rtCamp/action-slack-notify@v2
-      #   with:
-      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #     message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
-      #     color: good
-      #   if: success()
+      # Notify Slack
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@v2
+        with:
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
+          color: good
+        if: success()
