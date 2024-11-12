@@ -27,6 +27,14 @@ jobs:
         run: echo "SKIP_CI=true" >> $GITHUB_ENV
         if: ${{ steps.skip_check.outcome == 'success' }}
 
+      # Setup Paketo Buildpacks (Including Yarn Buildpack)
+      - name: Set up Paketo Buildpacks
+        run: |
+          curl -sSL https://github.com/cloudfoundry/buildpacks-ci/releases/download/v1.0.0/buildpacks-ci-linux-amd64 -o buildpacks-ci
+          chmod +x buildpacks-ci
+          ./buildpacks-ci pack buildpack-pipeline --buildpacks "paketo-buildpacks/environment-variables@4.5.1,paketo-buildpacks/yarn@1.3.10,paketo-buildpacks/nginx@0.17.4,paketo-buildpacks/web-servers" --env BP_WEB_SERVER=nginx --env BP_WEB_SERVER_ROOT=dist/omf-d-webapp --env BP_WEB_SERVER_ENABLE_PUSH_STATE=true --env BPE_DEFAULT_PORT=8080
+
+
       # Login to Docker registry with JFrog
       # - name: Set up JFrog CLI
       #   uses: jfrog/setup-jfrog-cli@v2
@@ -60,18 +68,6 @@ jobs:
       #     tag_name: ${{ github.ref_name }}
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-      # Add Buildpacks for Paketo Nginx and Web Servers
-      - name: Add Buildpacks and Build Docker Image
-        run: |
-          pack build my-app --builder paketobuildpacks/builder:full \
-            --buildpack paketo-buildpacks/environment-variables@4.5.1 \
-            --buildpack paketo-buildpacks/yarn@1.3.10 \
-            --buildpack paketo-buildpacks/nginx@0.17.4 \
-            --buildpack paketo-buildpacks/web-servers \
-            -e BP_WEB_SERVER=nginx \
-            -e BP_WEB_SERVER_ROOT=dist/omf-d-webapp \
-            -e BP_WEB_SERVER_ENABLE_PUSH_STATE=true \
-            -e BPE_DEFAULT_PORT=8080
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
