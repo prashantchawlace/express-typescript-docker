@@ -1,35 +1,38 @@
-name: CI Pipeline 
+name: CI Workflow
 
 on:
   push:
     branches:
-      - '**'
-  pull_request:
-    branches:
-      - '**'
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Check for [skip ci]
-        id: skip_check
-        run: |
-          if git log -1 --pretty=%s | grep -iqE '\[skip ci\]|\[ci skip\]'; then
-            echo "SKIP_CI=true" >> $GITHUB_ENV
-          else
-            echo "SKIP_CI=false" >> $GITHUB_ENV
-          fi
+      - name: Set up JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v2
+        with:
+          version: 2.24.2  # Specify the JFrog CLI version you'd like to use
 
-      - name: Login to JFrog Docker Registry
+      - name: Configure JFrog CLI with credentials
+        run: |
+          jfrog config add my-server \
+            --url ${{ secrets.JFROG_URL }} \
+            --user ${{ secrets.JFROG_USERNAME }} \
+            --password ${{ secrets.JFROG_PASSWORD }} \
+            --interactive=false
         env:
+          JFROG_URL: ${{ secrets.JFROG_URL }}
           JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
           JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+
+      - name: Login to JFrog Docker Registry
         run: |
-          echo "$JFROG_PASSWORD" | docker login -u "$JFROG_USERNAME" --password-stdin jfafn.jfrog.io
+          jfrog rt docker-login
 
       # Yarn Build
       - name: Install dependencies
