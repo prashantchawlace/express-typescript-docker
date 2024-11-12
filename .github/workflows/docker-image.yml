@@ -1,81 +1,81 @@
-name: CI/CD Pipeline
+name: CI Pipeline
 
 on:
   push:
     branches:
-      - alpha
-      - beta
-      - next
-      - master
+      - '**'
   pull_request:
-  tags:
-    - 'v*'
-#env:
-  #DEFAULT_REPO: jfafn.jfrog.io/omfauto-container
-  #WEBAPP_DIST_FOLDER: omf-d-webapp
-  #SONAR_HOST_URL: https://sonarqube.omf.cloud
-  #SLACK_CHANNEL: '#auto-los-jenkins'
-  #SLACK_NOTIFY_BRANCHES: alpha,beta,next,master
-  #SLACK_DEPLOYMENT_CHANNEL: '#omf-auto-deployments'
-  #NODE_VERSION: '16.x'
+    branches:
+      - '**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-steps:
-  - name: Check if CI should be skipped
-    run: |
-      SKIP_CI=$(git log -1 --pretty=%s | grep -E '\[skip ci\]|\[ci skip\]')
-      echo "SKIP_CI=$SKIP_CI" >> $GITHUB_ENV
-    shell: bash
-- name: Log in to Docker Registry
-  run: echo "${{ secrets.JFROG_PASSWORD }}" | docker login --username "${{ secrets.JFROG_USERNAME }}" --password-stdin jfafn.jfrog.io
-- name: Set up Node.js
-  uses: actions/setup-node@v3
-  with:
-    node-version: ${{ env.NODE_VERSION }}
-  - run: yarn install
-- name: Run Lint and Tests
-  run: |
-    yarn lint
-    yarn test --coverage
-- name: SonarCloud Scan
-  uses: sonarsource/sonarcloud-github-action@v1.7
-  with:
-    projectBaseDir: './'
-    args: -Dsonar.projectKey=${{ env.SONARQUBE_PROJ_KEY }}
-  env:
-    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-- name: Build Docker Image
-  run: docker build -t ${{ env.DEFAULT_REPO }}/$IMAGE:$TAG .
+    env:
+      DEFAULT_REPO: "jfafn.jfrog.io/omfauto-container"
+      WEBAPP_DIST_FOLDER: "omf-d-webapp"
+    steps:
+      - uses: actions/checkout@v2
 
-- name: Push Docker Image
-  run: docker push ${{ env.DEFAULT_REPO }}/$IMAGE:$TAG
-- name: Publish Tag and Changelog
-  uses: actions/create-release@v1
-  with:
-    tag_name: ${{ github.ref }}
-    release_name: Release ${{ github.ref }}
-    body: "Automatically generated release"
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-deploy:
-  needs: build
-  runs-on: ubuntu-latest
-  steps:
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: 'us-west-2'
-    - name: Upload to S3
-      run: |
-        aws s3 sync dist/ s3://$S3_BUCKET_NAME/$WEBAPP_DIST_FOLDER --acl public-read
-- name: Notify Slack
-  uses: 8398a7/action-slack@v3
-  with:
-    status: success
-    fields: repo,message
-  env:
-    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      # Skipping CI
+      - name: Check for [skip ci]
+        id: skip_check
+        run: git log -1 --pretty=%s | grep -iqE '\[skip ci\]|\[ci skip\]'
+        continue-on-error: true
+
+      - name: Set skip flag
+        run: echo "SKIP_CI=true" >> $GITHUB_ENV
+        if: ${{ steps.skip_check.outcome == 'success' }}
+
+      # Login to Docker registry with JFrog
+      - name: Set up JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v2
+      - name: Log in to JFrog Artifactory
+        run: |
+          echo ${{ secrets.JFROG_CREDENTIALS_PSW }} | docker login -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin "jfafn.jfrog.io"
+
+      # Yarn Build
+      - name: Install dependencies
+        run: yarn install
+      - name: Lint and Test
+        run: yarn lint && yarn test
+      - name: Build Project
+        run: yarn build
+
+      # SonarQube Scan
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@v1.5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          SONAR_HOST_URL: "https://sonarqube.omf.cloud"
+        with:
+          projectKey: ${{ secrets.SONARQUBE_PROJECT_KEY }}
+          organization: ${{ secrets.SONARQUBE_ORGANIZATION }}
+
+      # Publish Tag
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # Deployment to Dev
+      - name: Deploy to Dev
+        if: contains(github.ref, 'alpha')
+        env:
+          DEPLOY_ENVIRONMENT: "dev"
+        run: |
+          docker pull "$DEFAULT_REPO/${{ github.sha }}:latest"
+          docker tag "$DEFAULT_REPO/${{ github.sha }}:latest" "$DEFAULT_REPO/dev:latest"
+          docker push "$DEFAULT_REPO/dev:latest"
+
+      # Notify Slack
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@v2
+        with:
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
+          color: good
+        if: success()
