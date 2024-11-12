@@ -11,29 +11,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      DEFAULT_REPO: "jfafn.jfrog.io/omfauto-container"
-      WEBAPP_DIST_FOLDER: "omf-d-webapp"
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      # Skipping CI
       - name: Check for [skip ci]
         id: skip_check
-        run: git log -1 --pretty=%s | grep -iqE '\[skip ci\]|\[ci skip\]'
-        continue-on-error: true  # This prevents the workflow from stopping on exit code 1
-      
-      - name: Set skip flag
-        if: steps.skip_check.outcome == 'success'
-        run: echo "SKIP_CI=true" >> $GITHUB_ENV
-
-
-      # Login to Docker registry with JFrog
-      - name: Set up JFrog CLI
-        uses: jfrog/setup-jfrog-cli@v2
-      - name: Log in to JFrog Artifactory
         run: |
-          echo ${{ secrets.JFROG_CREDENTIALS_PSW }} | docker login -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin "jfafn.jfrog.io"
+          if git log -1 --pretty=%s | grep -iqE '\[skip ci\]|\[ci skip\]'; then
+            echo "SKIP_CI=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_CI=false" >> $GITHUB_ENV
+          fi
+
+      - name: Login to JFrog Docker Registry
+        env:
+          JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
+          JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+        run: |
+          echo "$JFROG_PASSWORD" | docker login -u "$JFROG_USERNAME" --password-stdin jfafn.jfrog.io
 
       # Yarn Build
       - name: Install dependencies
