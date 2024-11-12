@@ -13,27 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      #- name: Set up JFrog CLI
-      #  uses: jfrog/setup-jfrog-cli@v2
-      #  with:
-      #    version: 2.24.2  # Specify the JFrog CLI version you'd like to use
-
-      #- name: Configure JFrog CLI with credentials
-      #  run: |
-      #    jfrog config add my-server \
-      #      --url ${{ secrets.JFROG_URL }} \
-      #      --user ${{ secrets.JFROG_USERNAME }} \
-      #      --password ${{ secrets.JFROG_PASSWORD }} \
-      #      --interactive=false
-      #  env:
-      #    JFROG_URL: ${{ secrets.JFROG_URL }}
-      #    JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
-      #    JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-
-      #- name: Login to JFrog Docker Registry
-      #  run: |
-      #    jfrog rt docker-login
-
       # Yarn Build
       - name: Install dependencies
         run: yarn install
