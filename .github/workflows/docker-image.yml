@@ -1,129 +1,81 @@
 name: CI/CD Pipeline
 
 on:
-  push: 
+  push:
     branches:
-      - 'alpha'
-      - 'beta'
-      - 'next'
-      - 'master'
-      - 'v[0-9]+.[0-9]+.x'
-    tags:
-      - 'v*'
+      - alpha
+      - beta
+      - next
+      - master
   pull_request:
-
-env:
-  DEFAULT_REPO: "jfafn.jfrog.io/omfauto-container"
-  WEBAPP_DIST_FOLDER: "omf-d-webapp"
-  SONAR_HOST_URL: "https://sonarqube.omf.cloud"
-  SLACK_CHANNEL: "#auto-los-jenkins"
-  SLACK_NOTIFY_BRANCHES: "alpha,beta,next,master"
-  SLACK_DEPLOYMENT_CHANNEL: "#omf-auto-deployments"
+  tags:
+    - 'v*'
+#env:
+  #DEFAULT_REPO: jfafn.jfrog.io/omfauto-container
+  #WEBAPP_DIST_FOLDER: omf-d-webapp
+  #SONAR_HOST_URL: https://sonarqube.omf.cloud
+  #SLACK_CHANNEL: '#auto-los-jenkins'
+  #SLACK_NOTIFY_BRANCHES: alpha,beta,next,master
+  #SLACK_DEPLOYMENT_CHANNEL: '#omf-auto-deployments'
+  #NODE_VERSION: '16.x'
 
 jobs:
-  skip-ci:
+  build:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+steps:
+  - name: Check if CI should be skipped
+    run: |
+      SKIP_CI=$(git log -1 --pretty=%s | grep -E '\[skip ci\]|\[ci skip\]')
+      echo "SKIP_CI=$SKIP_CI" >> $GITHUB_ENV
+    shell: bash
+- name: Log in to Docker Registry
+  run: echo "${{ secrets.JFROG_PASSWORD }}" | docker login --username "${{ secrets.JFROG_USERNAME }}" --password-stdin jfafn.jfrog.io
+- name: Set up Node.js
+  uses: actions/setup-node@v3
+  with:
+    node-version: ${{ env.NODE_VERSION }}
+  - run: yarn install
+- name: Run Lint and Tests
+  run: |
+    yarn lint
+    yarn test --coverage
+- name: SonarCloud Scan
+  uses: sonarsource/sonarcloud-github-action@v1.7
+  with:
+    projectBaseDir: './'
+    args: -Dsonar.projectKey=${{ env.SONARQUBE_PROJ_KEY }}
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+- name: Build Docker Image
+  run: docker build -t ${{ env.DEFAULT_REPO }}/$IMAGE:$TAG .
 
-      - name: Check for [skip ci] in commit message
-        run: |
-          git log -1 --pretty=%s | grep -iqE "\[skip ci\]|\[ci skip\]"
-          echo "SKIP_CI=true" >> $GITHUB_ENV || true
-
-  login-to-docker:
-    runs-on: ubuntu-latest
-    needs: [skip-ci]
-    if: env.SKIP_CI != 'true'
-    steps:
-      - name: Log in to Docker registry
-        run: echo "${{ secrets.JFROG_CREDENTIALS_PSW }}" | docker login jfafn.jfrog.io -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin
-
-  build-test:
-    runs-on: ubuntu-latest
-    needs: [login-to-docker]
-    if: github.event.pull_request != null && env.SKIP_CI != 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup NPM and Auth
-        run: |
-          echo "_auth=${{ secrets.JFROG_AUTH }}" > .npmrc
-          echo "email=${{ secrets.JFROG_EMAIL }}" >> .npmrc
-          echo "always-auth=true" >> .npmrc
-          echo "registry=https://jfafn.jfrog.io/artifactory/api/npm/omfauto-npm/" >> .npmrc
-
-      - name: Run Tests
-        run: |
-          mkdir -p coverage
-          node <your-test-command> # Run your test commands here
-
-  sonar-scan:
-    runs-on: ubuntu-latest
-    needs: [build-test]
-    if: github.event.pull_request != null && env.SKIP_CI != 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Download SonarQube Scanner
-        uses: SonarSource/sonarcloud-github-action@master
-        with:
-          organization: ${{ env.SONARQUBE_ENV }}
-          projectKey: ${{ env.SONARQUBE_PROJ_KEY }}
-          projectName: ${{ env.SONARQUBE_PROJ_NAME }}
-
-      - name: Run SonarQube Scan
-        run: sonar-scanner -Dsonar.login=${{ secrets.SONARQUBE_TOKEN_NAME }} -Dsonar.host.url=${{ env.SONAR_HOST_URL }}
-
-  publish-and-changelog:
-    runs-on: ubuntu-latest
-    needs: [sonar-scan]
-    if: github.ref_name =~ '^(alpha|beta|next|master|v[0-9]+\\.[0-9]+\\.x)$' && env.SKIP_CI != 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Publish Tag and Release
-        env:
-          GH_TOKEN: ${{ secrets.OMFAUTO_RELEASER }}
-        run: |
-          semantic-release
-
-  deploy-to-dev:
-    runs-on: ubuntu-latest
-    needs: [publish-and-changelog]
-    if: github.ref_name =~ '^v\\d+\\.\\d+\\.\\d+-alpha\\.\\d+$'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Deploy to Development
-        run: |
-          aws s3 sync dist/${{ env.WEBAPP_DIST_FOLDER }} s3://${{ env.DEPLOY_ENVIRONMENT_BUCKET }}
-          echo "Deployment to Dev successful"
-
-  slack-notify:
-    runs-on: ubuntu-latest
-    needs: [skip-ci, publish-and-changelog, deploy-to-dev]
-    if: failure()
-    steps:
-      - name: Notify on Slack
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: "Build failure for ${{ github.event_name }} in branch ${{ github.ref_name }}"
-          author_name: "GitHub Actions"
-          channel: ${{ env.SLACK_CHANNEL }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  cleanup:
-    runs-on: ubuntu-latest
-    needs: [slack-notify, deploy-to-dev]
-    steps:
-      - name: Clean Workspace
-        run: rm -rf ${{ github.workspace }}
+- name: Push Docker Image
+  run: docker push ${{ env.DEFAULT_REPO }}/$IMAGE:$TAG
+- name: Publish Tag and Changelog
+  uses: actions/create-release@v1
+  with:
+    tag_name: ${{ github.ref }}
+    release_name: Release ${{ github.ref }}
+    body: "Automatically generated release"
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+deploy:
+  needs: build
+  runs-on: ubuntu-latest
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: 'us-west-2'
+    - name: Upload to S3
+      run: |
+        aws s3 sync dist/ s3://$S3_BUCKET_NAME/$WEBAPP_DIST_FOLDER --acl public-read
+- name: Notify Slack
+  uses: 8398a7/action-slack@v3
+  with:
+    status: success
+    fields: repo,message
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
