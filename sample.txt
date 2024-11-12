@@ -1,0 +1,33 @@
+[build]
+exclude = [
+  "Jenkinsfile",
+  "helm"
+]
+
+[[build.buildpacks]]
+uri = "paketo-buildpacks/environment-variables@4.5.1"
+
+[[build.buildpacks]]
+uri = "paketo-buildpacks/yarn@1.3.10"
+
+[[build.buildpacks]]
+uri = "paketo-buildpacks/nginx@0.17.4"
+
+[[build.buildpacks]]
+uri = "paketo-buildpacks/web-servers"
+
+[[build.env]]
+name = 'BP_WEB_SERVER'
+value = 'nginx'
+
+[[build.env]]
+name = 'BP_WEB_SERVER_ROOT'
+value = 'dist/omf-d-webapp'
+
+[[build.env]]
+name = 'BP_WEB_SERVER_ENABLE_PUSH_STATE'
+value = 'true'
+
+[[build.env]]
+name = 'BPE_DEFAULT_PORT'
+value = '8080'
