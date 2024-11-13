@@ -44,18 +44,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # SonarQube Scan
-      - name: SonarQube Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-        run: |
-          curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
-          unzip sonar-scanner.zip
-          export PATH="$PATH:${PWD}/sonar-scanner-4.6.2.2472-linux/bin"
-          sonar-scanner -X \
-            -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }} \
-            -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }} \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+      # # SonarQube Scan
+      # - name: SonarQube Scan
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+      #   run: |
+      #     curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
+      #     unzip sonar-scanner.zip
+      #     export PATH="$PATH:${PWD}/sonar-scanner-4.6.2.2472-linux/bin"
+      #     sonar-scanner -X \
+      #       -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }} \
+      #       -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }} \
+      #       -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
 
       # Create Release for Tags
       - name: Create Release
