@@ -11,9 +11,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      DEFAULT_REPO: "jfafn.jfrog.io/omfauto-container"
-      WEBAPP_DIST_FOLDER: "omf-d-webapp"
+    # env:
+    #   DEFAULT_REPO: "jfafn.jfrog.io/omfauto-container"
+    #   WEBAPP_DIST_FOLDER: "omf-d-webapp"
     steps:
       - uses: actions/checkout@v2
 
