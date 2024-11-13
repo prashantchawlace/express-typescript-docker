@@ -27,12 +27,12 @@ jobs:
         run: echo "SKIP_CI=true" >> $GITHUB_ENV
         if: ${{ steps.skip_check.outcome == 'success' }}
 
-      # Login to Docker registry with JFrog
-      # - name: Set up JFrog CLI
-      #   uses: jfrog/setup-jfrog-cli@v2
-      # - name: Log in to JFrog Artifactory
-      #   run: |
-      #     echo ${{ secrets.JFROG_CREDENTIALS_PSW }} | docker login -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin "jfafn.jfrog.io"
+      Login to Docker registry with JFrog
+      - name: Set up JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v2
+      - name: Log in to JFrog Artifactory
+        run: |
+          echo ${{ secrets.JFROG_CREDENTIALS_PSW }} | docker login -u "${{ secrets.JFROG_CREDENTIALS_USR }}" --password-stdin "jfafn.jfrog.io"
 
       # Yarn Build
       - name: Install dependencies
