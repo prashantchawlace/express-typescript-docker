@@ -48,16 +48,27 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'  # Choose your preferred distribution
-          
-      # SonarQube Scan
+
+     # SonarQube Scan
       - name: SonarQube Scan
         uses: SonarSource/sonarcloud-github-action@v1.5
         env:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-          SONAR_HOST_URL: "https://sonarqube.omf.cloud"
         with:
-          projectKey: ${{ secrets.SONARQUBE_PROJECT_KEY }}
-          organization: ${{ secrets.SONARQUBE_ORGANIZATION }}
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }}
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+            
+      # # SonarQube Scan
+      # - name: SonarQube Scan
+      #   uses: SonarSource/sonarcloud-github-action@v1.5
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+      #     SONAR_HOST_URL: "https://sonarqube.omf.cloud"
+      #   with:
+      #     projectKey: ${{ secrets.SONARQUBE_PROJECT_KEY }}
+      #     organization: ${{ secrets.SONARQUBE_ORGANIZATION }}
 
       # Publish Tag
       - name: Create Release
