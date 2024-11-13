@@ -51,15 +51,14 @@ jobs:
 
       # SonarQube Scan
       - name: SonarQube Scan
-        uses: SonarSource/sonarcloud-github-action@v1.5
         env:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
-          PATH: ${{ env.JAVA_HOME_17_X64 }}/bin:${{ env.PATH }}
-        with:
-          args: >
-            -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
-            -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }}
+          PATH: "${{ env.JAVA_HOME_17_X64 }}/bin:${{ env.PATH }}:${PWD}/sonar-scanner-4.6.2.2472-linux/bin"
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }} \
+            -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }} \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
             
       # # SonarQube Scan
