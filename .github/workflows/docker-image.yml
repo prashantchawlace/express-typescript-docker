@@ -49,11 +49,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'  # Choose your preferred distribution
 
-     # SonarQube Scan
+      # SonarQube Scan
       - name: SonarQube Scan
         uses: SonarSource/sonarcloud-github-action@v1.5
         env:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+          PATH: ${{ env.JAVA_HOME_17_X64 }}/bin:${{ env.PATH }}
         with:
           args: >
             -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
