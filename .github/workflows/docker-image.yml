@@ -91,7 +91,7 @@ jobs:
       - name: Docker login to JFrog
         run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
 
-      # Build Docker image
+      # Build Docker image 
       - name: Build Docker Image
         run: docker build . --file Dockerfile --tag ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
 
