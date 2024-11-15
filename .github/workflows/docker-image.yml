@@ -99,13 +99,13 @@ jobs:
 
       
       - name: Docker login to JFrog
-        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081/artifactory/webapp/#/home --username ${{ secrets.JFROG_USERNAME }} --password-stdin
       
       - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag http://16.170.217.244:8081/artifactory/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+        run: docker build . --file Dockerfile --tag http://16.170.217.244:8081/artifactory/webapp/#/home/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
       
       - name: Push Docker Image to JFrog
-        run: docker push http://16.170.217.244:8081/artifactory/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+        run: docker push http://16.170.217.244:8081/artifactory/webapp/#/home/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
       
 
 
