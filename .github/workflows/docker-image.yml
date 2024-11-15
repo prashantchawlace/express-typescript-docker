@@ -88,32 +88,25 @@ jobs:
             --interactive=false
 
 
-      # Log in to Docker (for JFrog Artifactory)
-   # Log in to Docker (for JFrog Artifactory)
-      - name: Docker login to JFrog
+      # Set up Docker to login to JFrog Artifactory
+      - name: Docker login to JFrog Artifactory
         run: |
-          export DOCKER_TLS_VERIFY=""
-          export DOCKER_REGISTRY="http://16.170.217.244:8081"
-          echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+          echo ${{ secrets.JFROG_API_KEY }} | docker login satishrepo.jfrog.io --username ${{ secrets.JFROG_USERNAME }} --password-stdin
 
-      # # Log in to Docker (for JFrog Artifactory)
-      # - name: Docker login to JFrog
-      #   run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
-
-      # Build Docker image 
+      # Build Docker image
       - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+        run: docker build . --file Dockerfile --tag satishrepo.jfrog.io/my-repo/express-typescript-docker:latest
 
-      # Push Docker image to JFrog
-      - name: Push Docker Image to JFrog
-        run: docker push ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+      # Push Docker image to JFrog Artifactory
+      - name: Push Docker Image to JFrog Artifactory
+        run: docker push satishrepo.jfrog.io/my-repo/express-typescript-docker:latest
 
-      # Notify Slack (Optional)
-      - name: Notify Slack
-        uses: rtCamp/action-slack-notify@v2
-        with:
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          message: "Deployment of ${{ github.sha }} to production succeeded"
-          color: good
-        if: success()
+      # # Notify Slack (Optional)
+      # - name: Notify Slack
+      #   uses: rtCamp/action-slack-notify@v2
+      #   with:
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #     message: "Deployment of ${{ github.sha }} to production succeeded"
+      #     color: good
+      #   if: success()
 
