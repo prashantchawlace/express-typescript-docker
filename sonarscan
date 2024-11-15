@@ -1,0 +1,45 @@
+        stage("Sonar Scan") {
+             when {
+               beforeAgent true
+               changeRequest()
+             }
+             agent {
+                docker {
+                       image "${env.VIRTUAL_REGISTRY_REPO}/${env.SONARQUBE_IMAGE}"
+                       registryCredentialsId 'jfrog'
+                       registryUrl env.REGISTRY_URL
+                       }
+                 }
+                 environment {
+                 SONARQUBE_TOKEN = credentials("${env.SONARQUBE_TOKEN_NAME}")
+                 }
+                 steps {
+                        dir('sonar-reports') {
+                            unstash 'sonar-reports'
+                        }
+                        withSonarQubeEnv("${env.SONARQUBE_ENV}") {
+                            sh "DEBUG=false ${WORKSPACE}/bin/sonar-scanner.sh"
+                        }
+              }
+         }
+
+
+  "sonar_qube_config": {
+    "image": "sonarsource/sonar-scanner-cli:5",
+    "project_base_dir": ".",
+    "project_key": "omfauto:dealer-webapp",
+    "project_name": "dealer-webapp",
+    "source": ".",
+    "branch_name": "alpha",
+    "target": {
+      "development": {
+        "endpoint": "https://evsonarqd01.corp.fin",
+        "token_name": "SQ_OMFAUTO_LOS_WEBAPP_TERRAFORM_DEV",
+        "environment": "sonarqube-dev"
+      },
+      "production": {
+        "endpoint": "https://sonarqube.omf.cloud",
+        "token_name": "SQ_OMFAUTO_SCANNER_TS_PROD",
+        "environment": "sonarqube-prod"
+      }
+    }
