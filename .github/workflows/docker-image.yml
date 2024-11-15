@@ -39,10 +39,11 @@ jobs:
             --password ${{ secrets.JFROG_PASSWORD }} \
             --interactive=false
 
-      # Log in to Docker
-      - name: Docker Login to JFrog
+      # Docker login directly to Artifactory
+      - name: Docker Login to Artifactory
         run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 \
           --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+      
 
       # Build Docker image
       - name: Build Docker Image
