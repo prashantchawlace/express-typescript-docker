@@ -97,18 +97,29 @@ jobs:
             --enc-password=false \
             --interactive=false
 
+      
+      - name: Docker login to JFrog
+        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+      
+      - name: Build Docker Image
+        run: docker build . --file Dockerfile --tag http://16.170.217.244:8081/artifactory/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+      
+      - name: Push Docker Image to JFrog
+        run: docker push http://16.170.217.244:8081/artifactory/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+      
+
 
       # Log in to Docker (for JFrog Artifactory)
-      - name: Docker login to JFrog
-        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+      # - name: Docker login to JFrog
+      #   run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
 
-      # Build Docker image 
-      - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+      # # Build Docker image 
+      # - name: Build Docker Image
+      #   run: docker build . --file Dockerfile --tag ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
 
-      # Push Docker image to JFrog
-      - name: Push Docker Image to JFrog
-        run: docker push ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
+      # # Push Docker image to JFrog
+      # - name: Push Docker Image to JFrog
+      #   run: docker push ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
 
       # Notify Slack (Optional)
       # - name: Notify Slack
