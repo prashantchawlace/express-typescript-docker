@@ -99,7 +99,8 @@ jobs:
 
       # Push Docker image to JFrog Artifactory
       - name: Push Docker Image to JFrog Artifactory
-        run: docker push satishrepo.jfrog.io/artifactory/api/docker/my-repo-docker/express-typescript-docker:latest
+        run: docker push satishrepo.jfrog.io/my-repo-docker/express-typescript-docker:latest
+
 
       # # Notify Slack (Optional)
       # - name: Notify Slack
