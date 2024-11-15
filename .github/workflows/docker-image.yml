@@ -95,11 +95,11 @@ jobs:
 
       # Build Docker image
       - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag satishrepo.jfrog.io/my-repo/express-typescript-docker:latest
+        run: docker build . --file Dockerfile --tag satishrepo.jfrog.io/artifactory/api/docker/my-repo-docker/express-typescript-docker:latest
 
       # Push Docker image to JFrog Artifactory
       - name: Push Docker Image to JFrog Artifactory
-        run: docker push satishrepo.jfrog.io/my-repo/express-typescript-docker:latest
+        run: docker push satishrepo.jfrog.io/artifactory/api/docker/my-repo-docker/express-typescript-docker:latest
 
       # # Notify Slack (Optional)
       # - name: Notify Slack
