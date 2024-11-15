@@ -87,9 +87,14 @@ jobs:
             --enc-password=false \
             --interactive=false
 
+
       # Log in to Docker (for JFrog Artifactory)
       - name: Docker login to JFrog
-        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 --username ${{ secrets.JFROG_USERNAME }} --password-stdin --insecure
+
+      # # Log in to Docker (for JFrog Artifactory)
+      # - name: Docker login to JFrog
+      #   run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
 
       # Build Docker image 
       - name: Build Docker Image
