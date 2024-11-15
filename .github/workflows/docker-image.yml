@@ -81,11 +81,22 @@ jobs:
       - uses: actions/checkout@v3
 
       # Set up JFrog CLI
+      # - name: Setup JFrog CLI
+      #   run: |
+      #     curl -fL https://getcli.jfrog.io | sh
+      #     ./jfrog config add jfrog-server --url ${{ secrets.JFROG_URL }} \
+      #     --user ${{ secrets.JFROG_USERNAME }} --password ${{ secrets.JFROG_PASSWORD }} --interactive=false
+
       - name: Setup JFrog CLI
         run: |
           curl -fL https://getcli.jfrog.io | sh
-          ./jfrog config add jfrog-server --url ${{ secrets.JFROG_URL }} \
-          --user ${{ secrets.JFROG_USERNAME }} --password ${{ secrets.JFROG_PASSWORD }} --interactive=false
+          ./jfrog config add jfrog-server \
+            --url ${{ secrets.JFROG_URL }} \
+            --user ${{ secrets.JFROG_USERNAME }} \
+            --password ${{ secrets.JFROG_PASSWORD }} \
+            --enc-password=false \
+            --interactive=false
+
 
       # Log in to Docker (for JFrog Artifactory)
       - name: Docker login to JFrog
