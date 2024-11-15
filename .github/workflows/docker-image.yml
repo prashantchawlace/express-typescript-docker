@@ -1,5 +1,5 @@
 name: CI Pipeline
- 
+
 on:
   push:
     branches:
@@ -28,14 +28,17 @@ jobs:
       # Install dependencies (Yarn)
       - name: Install dependencies
         run: yarn install
+        if: ${{ env.SKIP_CI != 'true' }}
 
       # Lint and Test
       - name: Lint and Test
         run: yarn lint && yarn test
+        if: ${{ env.SKIP_CI != 'true' }}
 
       # Build Project
       - name: Build Project
         run: yarn build
+        if: ${{ env.SKIP_CI != 'true' }}
 
       # Setup Java 17 (if required for the environment)
       - name: Set up JDK 17
@@ -44,7 +47,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # # SonarQube Scan
+      # Uncomment and configure SonarQube Scan if necessary
       # - name: SonarQube Scan
       #   env:
       #     SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
@@ -84,7 +87,6 @@ jobs:
             --enc-password=false \
             --interactive=false
 
-
       # Log in to Docker (for JFrog Artifactory)
       - name: Docker login to JFrog
         run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
@@ -98,18 +100,11 @@ jobs:
         run: docker push ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
 
       # Notify Slack (Optional)
-      # - name: Notify Slack
-      #   uses: rtCamp/action-slack-notify@v2
-      #   with:
-      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #     message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
-      #     color: good
-      #   if: success()
-      # Notify Slack (Optional)
-      # - name: Notify Slack
-      #   uses: rtCamp/action-slack-notify@v2
-      #   with:
-      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #     message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
-      #     color: good
-      #   if: success()
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@v2
+        with:
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          message: "Deployment of ${{ github.sha }} to production succeeded"
+          color: good
+        if: success()
+
