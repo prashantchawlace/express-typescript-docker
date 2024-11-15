@@ -29,20 +29,19 @@ jobs:
       - name: Build Project
         run: yarn build
 
-      # Set up JFrog CLI
       - name: Setup JFrog CLI
         run: |
           curl -fL https://getcli.jfrog.io | sh
-          ./jfrog config add artifactory-server \
+          ./jfrog config add jfrog-server \
             --url http://16.170.217.244:8081/artifactory \
-            --user ${{ secrets.JFROG_USERNAME }} \
-            --password ${{ secrets.JFROG_PASSWORD }} \
+            --user admin \
+            --password satish1234 \
             --interactive=false
 
-      # Docker login directly to Artifactory
       - name: Docker Login to Artifactory
         run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 \
-          --username ${{ secrets.JFROG_USERNAME }} --password-stdin
+          --username admin --password-stdin
+
       
 
       # Build Docker image
