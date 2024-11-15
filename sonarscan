@@ -1,0 +1,24 @@
+        stage("Sonar Scan") {
+             when {
+               beforeAgent true
+               changeRequest()
+             }
+             agent {
+                docker {
+                       image "${env.VIRTUAL_REGISTRY_REPO}/${env.SONARQUBE_IMAGE}"
+                       registryCredentialsId 'jfrog'
+                       registryUrl env.REGISTRY_URL
+                       }
+                 }
+                 environment {
+                 SONARQUBE_TOKEN = credentials("${env.SONARQUBE_TOKEN_NAME}")
+                 }
+                 steps {
+                        dir('sonar-reports') {
+                            unstash 'sonar-reports'
+                        }
+                        withSonarQubeEnv("${env.SONARQUBE_ENV}") {
+                            sh "DEBUG=false ${WORKSPACE}/bin/sonar-scanner.sh"
+                        }
+              }
+         }
