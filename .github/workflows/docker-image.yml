@@ -89,8 +89,12 @@ jobs:
 
 
       # Log in to Docker (for JFrog Artifactory)
+   # Log in to Docker (for JFrog Artifactory)
       - name: Docker login to JFrog
-        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 --username ${{ secrets.JFROG_USERNAME }} --password-stdin --insecure
+        run: |
+          export DOCKER_TLS_VERIFY=""
+          export DOCKER_REGISTRY="http://16.170.217.244:8081"
+          echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
 
       # # Log in to Docker (for JFrog Artifactory)
       # - name: Docker login to JFrog
