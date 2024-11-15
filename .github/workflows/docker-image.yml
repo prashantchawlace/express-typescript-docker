@@ -88,15 +88,15 @@ jobs:
             --interactive=false
 
 
-      # Set up Docker to login to JFrog Artifactory
+      # Docker login to JFrog Artifactory
       - name: Docker login to JFrog Artifactory
         run: |
           echo ${{ secrets.JFROG_API_KEY }} | docker login satishrepo.jfrog.io --username ${{ secrets.JFROG_USERNAME }} --password-stdin
-
+      
       # Build Docker image
       - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag satishrepo.jfrog.io/artifactory/api/docker/my-repo-docker/express-typescript-docker:latest
-
+        run: docker build . --file Dockerfile --tag satishrepo.jfrog.io/my-repo-docker/express-typescript-docker:latest
+      
       # Push Docker image to JFrog Artifactory
       - name: Push Docker Image to JFrog Artifactory
         run: docker push satishrepo.jfrog.io/my-repo-docker/express-typescript-docker:latest
