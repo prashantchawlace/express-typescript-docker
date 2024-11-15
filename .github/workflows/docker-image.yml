@@ -1,5 +1,5 @@
-name: CI/CD Pipeline
-
+name: CI Pipeline
+ 
 on:
   push:
     branches:
@@ -9,54 +9,107 @@ on:
       - '**'
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v2
 
-      # Install dependencies using Yarn
-      - name: Install Dependencies
+      # Skipping CI
+      - name: Check for [skip ci]
+        id: skip_check
+        run: git log -1 --pretty=%s | grep -iqE '\[skip ci\]|\[ci skip\]'
+        continue-on-error: true
+
+      - name: Set skip flag
+        run: echo "SKIP_CI=true" >> $GITHUB_ENV
+        if: ${{ steps.skip_check.outcome == 'success' }}
+
+      # Install dependencies (Yarn)
+      - name: Install dependencies
         run: yarn install
 
-      # Run lint and tests
+      # Lint and Test
       - name: Lint and Test
         run: yarn lint && yarn test
 
-      # Build the project
+      # Build Project
       - name: Build Project
         run: yarn build
 
+      # Setup Java 17 (if required for the environment)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # # SonarQube Scan
+      # - name: SonarQube Scan
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+      #   run: |
+      #     curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
+      #     unzip sonar-scanner.zip
+      #     export PATH="$PATH:${PWD}/sonar-scanner-4.6.2.2472-linux/bin"
+      #     sonar-scanner -X \
+      #       -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }} \
+      #       -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }} \
+      #       -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+
+      # Create Release for Tags
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # Upload Build Artifacts
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: dist/  # Assuming build outputs to the 'dist' folder
+
+      # Set up JFrog CLI
       - name: Setup JFrog CLI
         run: |
           curl -fL https://getcli.jfrog.io | sh
           ./jfrog config add jfrog-server \
-            --url http://16.170.217.244:8081/artifactory \
-            --user admin \
-            --password satish1234 \
+            --url ${{ secrets.JFROG_URL }} \
+            --user ${{ secrets.JFROG_USERNAME }} \
+            --password ${{ secrets.JFROG_PASSWORD }} \
+            --enc-password=false \
             --interactive=false
 
-      - name: Docker Login to Artifactory
-        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login http://16.170.217.244:8081 \
-          --username admin --password-stdin
 
-      
+      # Log in to Docker (for JFrog Artifactory)
+      - name: Docker login to JFrog
+        run: echo ${{ secrets.JFROG_PASSWORD }} | docker login ${{ secrets.JFROG_URL }} --username ${{ secrets.JFROG_USERNAME }} --password-stdin
 
-      # Build Docker image
+      # Build Docker image 
       - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag 16.170.217.244:8081/example-repo-local/express-typescript-docker:latest
+        run: docker build . --file Dockerfile --tag ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
 
-      # Push Docker image to JFrog Artifactory
+      # Push Docker image to JFrog
       - name: Push Docker Image to JFrog
-        run: docker push 16.170.217.244:8081/example-repo-local/express-typescript-docker:latest
+        run: docker push ${{ secrets.JFROG_URL }}/${{ secrets.JFROG_REPOSITORY }}/express-typescript-docker:latest
 
-      # Notify (Optional)
-      # Uncomment and configure if you want notifications (e.g., Slack)
+      # Notify Slack (Optional)
       # - name: Notify Slack
       #   uses: rtCamp/action-slack-notify@v2
       #   with:
       #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #     message: "Successfully deployed Docker image to JFrog Artifactory."
+      #     message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
       #     color: good
+      #   if: success()
+      # Notify Slack (Optional)
+      # - name: Notify Slack
+      #   uses: rtCamp/action-slack-notify@v2
+      #   with:
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #     message: "Deployment of ${{ github.sha }} to ${DEPLOY_ENVIRONMENT} succeeded"
+      #     color: good
+      #   if: success()
