@@ -60,15 +60,6 @@ jobs:
       #       -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }} \
       #       -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
 
-      # Create Release for Tags
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          tag_name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-
       # Upload Build Artifacts
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
